@@ -5,6 +5,7 @@ import "./IMP.sol";
 contract MultisigIMP is IMP {
 
     event NewProposal(uint256 id);
+    event AdminChanged(address oldAdmin, address newAdmin);
 
     struct Proposal {
         address author;
@@ -101,5 +102,29 @@ contract MultisigIMP is IMP {
 
         emit NewProposal(proposalsCount);
         proposalsCount++;
+    }
+
+    function proposeChangeAdmin(address oldAdmin, address newAdmin) public onlyAdmin {
+        require(isAdmin(oldAdmin), "Old admin is not found");
+        require(!isAdmin(newAdmin), "New admin is already admin");
+        require(newAdmin != address(0), "Cannot set zero address as admin");
+
+        bytes memory signature = abi.encodeWithSelector(
+            this.changeAdmin.selector,
+            oldAdmin,
+            newAdmin
+        );
+
+        addProposal(msg.sender, signature);
+    }
+
+    function changeAdmin(address oldAdmin, address newAdmin) public onlyMultisig {
+        for (uint i=0; i<admins.length; i++) {
+            if (admins[i] == oldAdmin) {
+                admins[i] = newAdmin;
+                emit AdminChanged(oldAdmin, newAdmin);
+                break;
+            }
+        }
     }
 }

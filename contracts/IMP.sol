@@ -208,7 +208,7 @@ contract IMP is ERC20Capped {
       groupData.currentEpoch += 1;
       groupData.airdropOffset = 0;
     } else {
-      groupData.airdropOffset += limit;
+      groupData.airdropOffset += 20;
     }
   }
 
