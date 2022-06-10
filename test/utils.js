@@ -1,3 +1,6 @@
+const ethers = require('ethers');  
+const crypto = require('crypto');
+
 const DAY = 86400
 
 const advanceTime = (time) => {
@@ -66,6 +69,22 @@ const getProposalId = (tx) => {
     return tx.receipt.logs[0].args.id.toNumber()
 }
 
+const generateRandomAccounts = (amount) => {
+    const participants = [];
+    const balances = [];
+
+    for (let i=0; i<amount; i++) {
+        const id = crypto.randomBytes(32).toString('hex');
+        const privateKey = "0x"+id;
+        const wallet = new ethers.Wallet(privateKey);
+        participants.push(wallet.address)
+        balances.push(Math.floor(Math.random() * 100000))
+    }
+
+    return [participants, balances]
+}
+
+
 module.exports = {
     advanceTime,
     advanceBlock,
@@ -73,5 +92,6 @@ module.exports = {
     takeSnapshot,
     revertToSnapShot,
     getProposalId,
+    generateRandomAccounts,
     DAY,
 }

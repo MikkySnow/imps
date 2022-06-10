@@ -7,7 +7,7 @@ const {
     expectRevert, // Assertions for transactions that should fail
 } = require('@openzeppelin/test-helpers');
 
-const { advanceTimeAndBlock, DAY, getProposalId } = require('./utils');
+const { advanceTimeAndBlock, DAY, getProposalId, generateRandomAccounts } = require('./utils');
 
 advanceTime = (time) => {
     return new Promise((resolve, reject) => {
@@ -211,6 +211,61 @@ contract('IMP', (accounts) => {
 
             await expectRevert.unspecified(
                 token.confirmProposal(getProposalId(tx), {from: accounts[1]})
+            )
+        });
+
+    })
+
+    describe("Change admin", () => {
+        let token;
+
+        before(async () => {
+            token = await IMP.new('test', 'test', 30000, accounts.slice(0, 3), { from: accounts[0] });
+        })
+
+        it('Admin can change admin', async () => {
+            const oldAdmin = accounts[1];
+            const newAdmin = accounts[5];
+
+            const tx = await token.proposeChangeAdmin(oldAdmin, newAdmin, { from: accounts[0] });
+            await advanceTimeAndBlock(2 * DAY)
+            await token.confirmProposal(getProposalId(tx), { from: accounts[2] })
+
+            const nextOldAdmin = accounts[5];
+            const nextNewAdmin = accounts[1];
+
+            const nextTx = await token.proposeChangeAdmin(nextOldAdmin, nextNewAdmin, { from: accounts[5] });
+            await advanceTimeAndBlock(2 * DAY)
+            await token.confirmProposal(getProposalId(nextTx), { from: accounts[2] })
+        });
+
+        it('Admin can`t propose zero-address to admin', async () => {
+            const oldAdmin = accounts[1];
+            const newAdmin = constants.ZERO_ADDRESS;
+
+            await expectRevert(
+                token.proposeChangeAdmin(oldAdmin, newAdmin, { from: accounts[0] }),
+                "Cannot set zero address as admin"
+            )
+        });
+
+        it('Old admin should be admin', async () => {
+            const oldAdmin = accounts[6];
+            const newAdmin = accounts[5];
+
+            await expectRevert(
+                token.proposeChangeAdmin(oldAdmin, newAdmin, { from: accounts[0] }),
+                "Old admin is not found"
+            )
+        });
+
+        it('New admin shouldn`t be admin', async () => {
+            const oldAdmin = accounts[1];
+            const newAdmin = accounts[2];
+
+            await expectRevert(
+                token.proposeChangeAdmin(oldAdmin, newAdmin, { from: accounts[0] }),
+                "New admin is already admin"
             )
         });
 
@@ -657,19 +712,14 @@ contract('IMP', (accounts) => {
 
         // seed: 8% after 3 * 30 days + 9 days, other for 93 weeks
         it("Seed group", async () => {
-            let participants = []
-            let balances = []
-            const countUsers = 10
+
+            const countUsers = 60
+            const [participants, balances] = generateRandomAccounts(60)
 
             let lockedBalanceBeforeArray = []
             let currentBalanceBeforeArray = []
             let lockedBalanceAfterArray = []
             let currentBalanceAfterArray = []
-
-            for (let i = 1; i < countUsers; i++) {
-                participants.push(accounts[i]);
-                balances.push(Math.floor(Math.random() * 100000));
-            }
 
             const addTx = await token.proposeAddParticipant(AllocationGroup.Seed, participants, balances);
             await advanceTimeAndBlock(2 * DAY);
@@ -684,23 +734,28 @@ contract('IMP', (accounts) => {
             await token.confirmProposal(getProposalId(mainnetTx), {from: accounts[1]})
 
             for (let i = 1; i < countUsers; i++) {
-                const lockedBalanceBefore = await token.getLockedBalance(accounts[i], AllocationGroup.Seed);
-                const currentBalanceBefore = await token.balanceOf(accounts[i]);
+                const lockedBalanceBefore = await token.getLockedBalance(participants[i], AllocationGroup.Seed);
+                const currentBalanceBefore = await token.balanceOf(participants[i]);
                 lockedBalanceBeforeArray.push(lockedBalanceBefore)
                 currentBalanceBeforeArray.push(currentBalanceBefore)
             }
 
             await advanceTimeAndBlock((3 * 30 + 9)* DAY);
             await token.distribute(AllocationGroup.Seed, { gas: 5000000, gasPrice: 500000000 });
+            await token.distribute(AllocationGroup.Seed, { gas: 5000000, gasPrice: 500000000 });
+            await token.distribute(AllocationGroup.Seed, { gas: 5000000, gasPrice: 500000000 });
+
 
             for (let i = 0; i < 92; i++) {
                 await advanceTimeAndBlock(7 * DAY);
                 await token.distribute(AllocationGroup.Seed, { gas: 5000000, gasPrice: 500000000 });
+                await token.distribute(AllocationGroup.Seed, { gas: 5000000, gasPrice: 500000000 });
+                await token.distribute(AllocationGroup.Seed, { gas: 5000000, gasPrice: 500000000 });
             }
 
             for (let i = 1; i < countUsers; i++) {
-                const lockedBalanceAfter = await token.getLockedBalance(accounts[i], AllocationGroup.Seed);
-                const currentBalanceAfter = await token.balanceOf(accounts[i]);
+                const lockedBalanceAfter = await token.getLockedBalance(participants[i], AllocationGroup.Seed);
+                const currentBalanceAfter = await token.balanceOf(participants[i]);
                 lockedBalanceAfterArray.push(lockedBalanceAfter)
                 currentBalanceAfterArray.push(currentBalanceAfter)
             }
